@@ -3,6 +3,9 @@
 CoCLI is a Go-based application which uses the Compose API to provide the ability
 to create, monitor and delete Compose databases.
 
+To use, an environment variable - COMPOSEAPITOKEN must be set. This token value
+can be obtained from the Compose console's Account view.
+
 Further details to follow.
 
 ```
