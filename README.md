@@ -17,6 +17,7 @@ A Compose CLI application
 Flags:
   --help    Show context-sensitive help (also try --help-long and --help-man).
   --raw     Output raw JSON responses
+  --fmt     Format output for readability
   --fullca  Show all of CA Certificates
 
 Commands:
@@ -32,7 +33,13 @@ Commands:
   show recipe [<recid>]
     Show recipe
 
-  show recipes [<depid>]
+  show deployment recipes [<depid>]
+    Show deployment recipes
+
+  show deployment versions [<depid>]
+    Show version and upgrades
+
+  show recipes
     Show recipes for a deployment
 
   show clusters
@@ -41,24 +48,13 @@ Commands:
   show user
     Show current associated user
 
+  show datacenters
+    Show available datacenters
+
+  show databases
+    Show available database types
+
   create deployment [<flags>] [<name>] [<type>]
     Create deployment
-
-$ cocli --help create deployment
-usage: cocli create deployment [<flags>] [<name>] [<type>]
-
-Create deployment
-
-Flags:
-  --help                   Show context-sensitive help (also try --help-long and
-                           --help-man).
-  --raw                    Output raw JSON responses
-  --fullca                 Show all of CA Certificates
-  --cluster=CLUSTER        Cluster ID
-  --datacenter=DATACENTER  Datacenter location
-
-Args:
-  [<name>]  New Deployment Name
-  [<type>]  New Deployment Type
 
 ```

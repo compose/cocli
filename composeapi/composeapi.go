@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/parnurzeal/gorequest"
 )
@@ -36,55 +35,6 @@ const (
 type Link struct {
 	HREF      string `json:"href"`
 	Templated bool   `json:"templated"`
-}
-
-// Recipe structure
-type Recipe struct {
-	ID           string `json:"id"`
-	Template     string `json:"template"`
-	Status       string `json:"status"`
-	StatusDetail string `json:"status_detail"`
-	AccountID    string `json:"account_id"`
-	DeploymentID string `json:"deployment_id"`
-	Name         string `json:"name"`
-
-	CreatedAt time.Time `json:"created_at"`
-	Embedded  struct {
-		Recipes []Recipe `json:"recipes"`
-	} `json:"_embedded"`
-}
-
-// Recipes structure (an array of Recipe)
-type Recipes struct {
-	Embedded struct {
-		Recipes []Recipe `json:"recipes"`
-	} `json:"_embedded"`
-}
-
-// Cluster structure
-type Cluster struct {
-	ID          string    `json:"id"`
-	AccountID   string    `json:"account_id"`
-	Name        string    `json:"name"`
-	Type        string    `json:"type"`
-	Provider    string    `json:"provider"`
-	Region      string    `json:"region"`
-	Multitenant bool      `json:"multitenant"`
-	AccountSlug string    `json:"account_slug"`
-	CreatedAt   time.Time `json:"created_at"`
-	Subdomain   string    `json:"subdomain"`
-}
-
-// ClustersResponse structure (an array of Cluster)
-type ClustersResponse struct {
-	Embedded struct {
-		Clusters []Cluster `json:"clusters"`
-	} `json:"_embedded"`
-}
-
-// User structure
-type User struct {
-	ID string `json:"id"`
 }
 
 func printJSON(jsontext string) {
@@ -183,6 +133,26 @@ func GetRecipesForDeployment(deploymentid string) (*[]Recipe, []error) {
 	return &recipes, nil
 }
 
+//GetVersionsForDeploymentJSON returns raw JSON for getVersionsforDeployment
+func GetVersionsForDeploymentJSON(deploymentid string) (string, []error) {
+	return getJSON("deployments/" + deploymentid + "/versions")
+}
+
+//GetVersionsForDeployment gets deployment recipe life
+func GetVersionsForDeployment(deploymentid string) (*[]VersionTransition, []error) {
+	body, errs := GetVersionsForDeploymentJSON(deploymentid)
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	versionsResponse := VersionsResponse{}
+	json.Unmarshal([]byte(body), &versionsResponse)
+	versionTransitions := versionsResponse.Embedded.VersionTransitions
+
+	return &versionTransitions, nil
+}
+
 //GetClustersJSON gets clusters available
 func GetClustersJSON() (string, []error) {
 	return getJSON("clusters")
@@ -201,6 +171,46 @@ func GetClusters() (*[]Cluster, []error) {
 	clusters := clustersResponse.Embedded.Clusters
 
 	return &clusters, nil
+}
+
+//GetDatacentersJSON gets datacenters available as a string
+func GetDatacentersJSON() (string, []error) {
+	return getJSON("datacenters")
+}
+
+//GetDatacenters gets datacenters available as a Go struct
+func GetDatacenters() (*[]Datacenter, []error) {
+	body, errs := GetDatacentersJSON()
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	datacenterResponse := DatacentersResponse{}
+	json.Unmarshal([]byte(body), &datacenterResponse)
+	datacenters := datacenterResponse.Embedded.Datacenters
+
+	return &datacenters, nil
+}
+
+//GetDatabasesJSON gets databases available as a string
+func GetDatabasesJSON() (string, []error) {
+	return getJSON("databases")
+}
+
+//GetDatabases gets databases available as a Go struct
+func GetDatabases() (*[]Database, []error) {
+	body, errs := GetDatabasesJSON()
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	datacenterResponse := DatabasesResponse{}
+	json.Unmarshal([]byte(body), &datacenterResponse)
+	databases := datacenterResponse.Embedded.Databases
+
+	return &databases, nil
 }
 
 //GetUserJSON returns user JSON string

@@ -27,18 +27,28 @@ import (
 var (
 	app = kingpin.New("cocli", "A Compose CLI application")
 
-	rawmodeflag             = app.Flag("raw", "Output raw JSON responses").Default("false").Bool()
-	formatflag              = app.Flag("fmt", "Format output for readability").Default("false").Bool()
-	fullcaflag              = app.Flag("fullca", "Show all of CA Certificates").Default("false").Bool()
-	showcmd                 = app.Command("show", "Show attribute")
-	showaccountcmd          = showcmd.Command("account", "Show account details")
-	showdeploymentscmd      = showcmd.Command("deployments", "Show deployments")
-	showrecipecmd           = showcmd.Command("recipe", "Show recipe")
-	showrecipeid            = showrecipecmd.Arg("recid", "Recipe ID").String()
-	showrecipescmd          = showcmd.Command("recipes", "Show recipes for a deployment")
-	showrecipesdeploymentid = showrecipescmd.Arg("depid", "Deployment ID").String()
-	showclusterscmd         = showcmd.Command("clusters", "Show available clusters")
-	showuser                = showcmd.Command("user", "Show current associated user")
+	rawmodeflag = app.Flag("raw", "Output raw JSON responses").Default("false").Bool()
+	formatflag  = app.Flag("fmt", "Format output for readability").Default("false").Bool()
+	fullcaflag  = app.Flag("fullca", "Show all of CA Certificates").Default("false").Bool()
+
+	showcmd            = app.Command("show", "Show attribute")
+	showaccountcmd     = showcmd.Command("account", "Show account details")
+	showdeploymentscmd = showcmd.Command("deployments", "Show deployments")
+	showrecipecmd      = showcmd.Command("recipe", "Show recipe")
+	showrecipeid       = showrecipecmd.Arg("recid", "Recipe ID").String()
+
+	showdeploymentcmd         = showcmd.Command("deployment", "Show deployment")
+	showdeploymentrecipescmd  = showdeploymentcmd.Command("recipes", "Show deployment recipes")
+	showdeploymentversionscmd = showdeploymentcmd.Command("versions", "Show version and upgrades")
+	showrecipesdepid          = showdeploymentrecipescmd.Arg("depid", "Deployment ID").String()
+	showversionsdepid         = showdeploymentversionscmd.Arg("depid", "Deployment ID").String()
+
+	showrecipescmd  = showcmd.Command("recipes", "Show recipes for a deployment")
+	showclusterscmd = showcmd.Command("clusters", "Show available clusters")
+	showuser        = showcmd.Command("user", "Show current associated user")
+
+	showdatacenters = showcmd.Command("datacenters", "Show available datacenters")
+	showdatabases   = showcmd.Command("databases", "Show available database types")
 
 	createcmd                  = app.Command("create", "Create...")
 	createdeploymentcmd        = createcmd.Command("deployment", "Create deployment")
@@ -74,14 +84,20 @@ func main() {
 		showAccount()
 	case "show deployments":
 		showDeployments()
+	case "show deployment recipes":
+		showRecipes()
+	case "show deployment versions":
+		showVersions()
 	case "show recipe":
 		showRecipe()
-	case "show recipes":
-		showRecipes()
 	case "show clusters":
 		showClusters()
 	case "show user":
 		showUser()
+	case "show datacenters":
+		showDatacenters()
+	case "show databases":
+		showDatabases()
 	case "create deployment":
 		createDeployment()
 	}
@@ -150,11 +166,12 @@ func showRecipe() {
 
 func showRecipes() {
 	if *rawmodeflag {
-		text, errs := composeapi.GetRecipesForDeploymentJSON(*showrecipesdeploymentid)
+		fmt.Println(*showrecipesdepid)
+		text, errs := composeapi.GetRecipesForDeploymentJSON(*showrecipesdepid)
 		bailOnErrs(errs)
 		fmt.Println(text)
 	} else {
-		recipes, errs := composeapi.GetRecipesForDeployment(*showrecipesdeploymentid)
+		recipes, errs := composeapi.GetRecipesForDeployment(*showrecipesdepid)
 		bailOnErrs(errs)
 		if *formatflag {
 			for _, v := range *recipes {
@@ -163,6 +180,25 @@ func showRecipes() {
 			}
 		} else {
 			printAsJSON(*recipes)
+		}
+	}
+}
+
+func showVersions() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetVersionsForDeploymentJSON(*showversionsdepid)
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		versions, errs := composeapi.GetVersionsForDeployment(*showversionsdepid)
+		bailOnErrs(errs)
+		if *formatflag {
+			for _, v := range *versions {
+				printVersionTransitions(v)
+				fmt.Println()
+			}
+		} else {
+			printAsJSON(*versions)
 		}
 	}
 }
@@ -200,6 +236,46 @@ func showUser() {
 			fmt.Println()
 		} else {
 			printAsJSON(user)
+		}
+	}
+}
+
+func showDatacenters() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetDatacentersJSON()
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		datacenters, errs := composeapi.GetDatacenters()
+		bailOnErrs(errs)
+
+		if *formatflag {
+			for _, v := range *datacenters {
+				printDatacenter(v)
+				fmt.Println()
+			}
+		} else {
+			printAsJSON(datacenters)
+		}
+	}
+}
+
+func showDatabases() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetDatabasesJSON()
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		databases, errs := composeapi.GetDatabases()
+		bailOnErrs(errs)
+
+		if *formatflag {
+			for _, v := range *databases {
+				printDatabase(v)
+				fmt.Println()
+			}
+		} else {
+			printAsJSON(databases)
 		}
 	}
 }
@@ -253,6 +329,12 @@ func printRecipe(recipe composeapi.Recipe) {
 
 }
 
+func printVersionTransitions(version composeapi.VersionTransition) {
+	fmt.Printf("%15s: %s\n", "Application", version.Application)
+	fmt.Printf("%15s: %s\n", "Method", version.Method)
+	fmt.Printf("%15s: %s\n", "From Version", version.FromVersion)
+	fmt.Printf("%15s: %s\n", "To Version", version.ToVersion)
+}
 func printCluster(cluster composeapi.Cluster) {
 	fmt.Printf("%15s: %s\n", "ID", cluster.ID)
 	fmt.Printf("%15s: %s\n", "Account ID", cluster.AccountID)
@@ -264,6 +346,12 @@ func printCluster(cluster composeapi.Cluster) {
 	fmt.Printf("%15s: %s\n", "Region", cluster.Region)
 	fmt.Printf("%15s: %s\n", "Created Ad", cluster.CreatedAt)
 	fmt.Printf("%15s: %s\n", "Subdomain", cluster.Subdomain)
+}
+
+func printDatacenter(datacenter composeapi.Datacenter) {
+	fmt.Printf("%15s: %s\n", "Region", datacenter.Region)
+	fmt.Printf("%15s: %s\n", "Provider", datacenter.Provider)
+	fmt.Printf("%15s: %s\n", "Slug", datacenter.Slug)
 }
 
 func printDeployment(deployment composeapi.Deployment) {
@@ -289,4 +377,19 @@ func printDeployment(deployment composeapi.Deployment) {
 	fmt.Printf("%15s: %s\n", "CLI Connect", deployment.Connection.CLI)
 	fmt.Printf("%15s: %s\n", "Direct Connect", deployment.Connection.Direct)
 
+}
+
+func printDatabase(database composeapi.Database) {
+	fmt.Printf("%15s: %s\n", "Type", database.DatabaseType)
+	fmt.Printf("%15s: %s\n", "Status", database.Status)
+
+	for _, v := range database.Embedded.Versions {
+		if v.Status != "deprecated" {
+			if v.Preferred {
+				fmt.Printf("%15s: %s (%s) Preferred\n", "Version", v.Version, v.Status)
+			} else {
+				fmt.Printf("%15s: %s (%s)\n", "Version", v.Version, v.Status)
+			}
+		}
+	}
 }
