@@ -15,18 +15,20 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/compose/cocli/composeapi"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"log"
 	"os"
 	"strings"
-
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
 	app = kingpin.New("cocli", "A Compose CLI application")
 
 	rawmodeflag             = app.Flag("raw", "Output raw JSON responses").Default("false").Bool()
+	formatflag              = app.Flag("fmt", "Format output for readability").Default("false").Bool()
 	fullcaflag              = app.Flag("fullca", "Show all of CA Certificates").Default("false").Bool()
 	showcmd                 = app.Command("show", "Show attribute")
 	showaccountcmd          = showcmd.Command("account", "Show account details")
@@ -52,6 +54,16 @@ const (
 	apibase = "https://api.compose.io/2016-07/"
 )
 
+func bailOnErrs(errs []error) {
+	if errs != nil {
+		log.Fatal(errs)
+	}
+}
+
+func printAsJSON(toprint interface{}) {
+	jsonstr, _ := json.MarshalIndent(toprint, "", " ")
+	fmt.Println(string(jsonstr))
+}
 func main() {
 	if apitoken == "" {
 		log.Fatal("COMPOSEAPITOKEN environment variable not set")
@@ -59,103 +71,177 @@ func main() {
 
 	switch kingpin.MustParse(app.Parse(os.Args[1:])) {
 	case "show account":
-		account, err := getAccount(*rawmodeflag)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Printf("%15s: %s\n", "ID", account.ID)
-		fmt.Printf("%15s: %s\n", "Name", account.Name)
-		fmt.Printf("%15s: %s\n", "Slug", account.Slug)
-		fmt.Println()
-
+		showAccount()
 	case "show deployments":
-		deployments, err := getDeployments(*rawmodeflag)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		for _, v := range *deployments {
-			fmt.Printf("%15s: %s\n", "ID", v.ID)
-			fmt.Printf("%15s: %s\n", "Name", v.Name)
-			fmt.Printf("%15s: %s\n", "Type", v.Type)
-			fmt.Printf("%15s: %s\n", "Created At", v.CreatedAt)
-			fmt.Printf("%15s: %s\n", "Web UI Link", getLink(v.Links.ComposeWebUILink))
-			fmt.Println()
-		}
+		showDeployments()
 	case "show recipe":
-		recipe, err := getRecipe(*rawmodeflag, *showrecipeid)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		printRecipe(*recipe)
+		showRecipe()
 	case "show recipes":
-		recipes, err := getRecipesForDeployment(*rawmodeflag, *showrecipesdeploymentid)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		for _, v := range *recipes {
-			printRecipe(v)
-			fmt.Println()
-		}
-
+		showRecipes()
 	case "show clusters":
-		clusters, err := getClusters(*rawmodeflag)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		for _, v := range *clusters {
-			printCluster(v)
-			fmt.Println()
-		}
+		showClusters()
 	case "show user":
-		user, err := getUser(*rawmodeflag)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Printf("%15s: %s\n", "ID", user.ID)
-		fmt.Println()
+		showUser()
 	case "create deployment":
-		account, err := getAccount(false)
-		if err != nil {
-			log.Fatal(err)
-		}
+		createDeployment()
+	}
+}
 
-		if *createdeploymentdatacenter == "" && *createdeploymentcluster == "" {
-			log.Fatal("Must supply either a --cluster id or --datacenter region")
-		}
+func showAccount() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetAccountJSON()
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		account, errs := composeapi.GetAccount()
+		bailOnErrs(errs)
 
-		deployment, err := createDeployment(*rawmodeflag,
-			*createdeploymentname,
-			*createdeploymenttype,
-			account.ID,
-			*createdeploymentdatacenter,
-			*createdeploymentcluster)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if deployment.Errors.Error != "" {
-			fmt.Printf("Error: %s\n", deployment.Errors.Error)
+		if *formatflag {
+			fmt.Printf("%15s: %s\n", "ID", account.ID)
+			fmt.Printf("%15s: %s\n", "Name", account.Name)
+			fmt.Printf("%15s: %s\n", "Slug", account.Slug)
+			fmt.Println()
 		} else {
-			printDeployment(*deployment)
+			printAsJSON(account)
 		}
 	}
 }
 
-func getLink(link Link) string {
+func showDeployments() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetDeploymentsJSON()
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		deployments, errs := composeapi.GetDeployments()
+		bailOnErrs(errs)
+
+		if *formatflag {
+			for _, v := range *deployments {
+				fmt.Printf("%15s: %s\n", "ID", v.ID)
+				fmt.Printf("%15s: %s\n", "Name", v.Name)
+				fmt.Printf("%15s: %s\n", "Type", v.Type)
+				fmt.Printf("%15s: %s\n", "Created At", v.CreatedAt)
+				fmt.Printf("%15s: %s\n", "Web UI Link", getLink(v.Links.ComposeWebUILink))
+				fmt.Println()
+			}
+		} else {
+			printAsJSON(deployments)
+		}
+	}
+}
+
+func showRecipe() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetRecipeJSON(*showrecipeid)
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		recipe, errs := composeapi.GetRecipe(*rawmodeflag, *showrecipeid)
+		bailOnErrs(errs)
+
+		if *formatflag {
+			printRecipe(*recipe)
+		} else {
+			printAsJSON(*recipe)
+		}
+	}
+}
+
+func showRecipes() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetRecipesForDeploymentJSON(*showrecipesdeploymentid)
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		recipes, errs := composeapi.GetRecipesForDeployment(*showrecipesdeploymentid)
+		bailOnErrs(errs)
+		if *formatflag {
+			for _, v := range *recipes {
+				printRecipe(v)
+				fmt.Println()
+			}
+		} else {
+			printAsJSON(*recipes)
+		}
+	}
+}
+
+func showClusters() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetClustersJSON()
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		clusters, errs := composeapi.GetClusters()
+		bailOnErrs(errs)
+
+		if *formatflag {
+			for _, v := range *clusters {
+				printCluster(v)
+				fmt.Println()
+			}
+		} else {
+			printAsJSON(clusters)
+		}
+	}
+}
+
+func showUser() {
+	if *rawmodeflag {
+		text, errs := composeapi.GetUserJSON()
+		bailOnErrs(errs)
+		fmt.Println(text)
+	} else {
+		user, errs := composeapi.GetUser()
+		bailOnErrs(errs)
+		if *formatflag {
+			fmt.Printf("%15s: %s\n", "ID", user.ID)
+			fmt.Println()
+		} else {
+			printAsJSON(user)
+		}
+	}
+}
+
+func createDeployment() {
+	if *rawmodeflag {
+		log.Fatal("Raw mode not supported for createDeployment")
+	}
+
+	account, errs := composeapi.GetAccount()
+	bailOnErrs(errs)
+
+	if *createdeploymentdatacenter == "" && *createdeploymentcluster == "" {
+		log.Fatal("Must supply either a --cluster id or --datacenter region")
+	}
+
+	params := composeapi.CreateDeploymentParams{
+		Name:         *createdeploymentname,
+		AccountID:    account.ID,
+		DatabaseType: *createdeploymenttype,
+		Datacenter:   *createdeploymentdatacenter,
+		ClusterID:    *createdeploymentcluster,
+	}
+
+	deployment, errs := composeapi.CreateDeployment(params)
+	bailOnErrs(errs)
+
+	if deployment.Errors.Error != "" {
+		fmt.Printf("Error: %s\n", deployment.Errors.Error)
+	} else {
+		if *formatflag {
+			printDeployment(*deployment)
+		} else {
+			printAsJSON(*deployment)
+		}
+	}
+}
+func getLink(link composeapi.Link) string {
 	return strings.Replace(link.HREF, "{?embed}", "", -1) // TODO: This should mangle the HREF properly
 }
 
-func printRecipe(recipe Recipe) {
+func printRecipe(recipe composeapi.Recipe) {
 	fmt.Printf("%15s: %s\n", "ID", recipe.ID)
 	fmt.Printf("%15s: %s\n", "Template", recipe.Template)
 	fmt.Printf("%15s: %s\n", "Status", recipe.Status)
@@ -167,7 +253,7 @@ func printRecipe(recipe Recipe) {
 
 }
 
-func printCluster(cluster Cluster) {
+func printCluster(cluster composeapi.Cluster) {
 	fmt.Printf("%15s: %s\n", "ID", cluster.ID)
 	fmt.Printf("%15s: %s\n", "Account ID", cluster.AccountID)
 	fmt.Printf("%15s: %s\n", "Account Slug", cluster.AccountSlug)
@@ -180,7 +266,7 @@ func printCluster(cluster Cluster) {
 	fmt.Printf("%15s: %s\n", "Subdomain", cluster.Subdomain)
 }
 
-func printDeployment(deployment Deployment) {
+func printDeployment(deployment composeapi.Deployment) {
 	fmt.Printf("%15s: %s\n", "ID", deployment.ID)
 	fmt.Printf("%15s: %s\n", "Name", deployment.Name)
 	fmt.Printf("%15s: %s\n", "Type", deployment.Type)
